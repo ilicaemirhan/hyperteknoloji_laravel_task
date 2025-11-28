@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Models\Cart;
 use App\Models\CartItem;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Exception;
 
 class CartService
 {
@@ -13,16 +15,21 @@ class CartService
      */
     public function getCart(): Cart
     {
-        // Use a session-level UUID as cart identifier
-        $sessionId = session()->get('cart_session_id');
+        try {
+            // Use a session-level UUID as cart identifier
+            $sessionId = session()->get('cart_session_id');
 
-        if (!$sessionId) {
-            $sessionId = Str::uuid()->toString();
-            session()->put('cart_session_id', $sessionId);
+            if (!$sessionId) {
+                $sessionId = Str::uuid()->toString();
+                session()->put('cart_session_id', $sessionId);
+            }
+
+            // Each session has one cart
+            return Cart::firstOrCreate(['session_id' => $sessionId]);
+        } catch (Exception $e) {
+            Log::error('CartService@getCart', ['error' => $e->getMessage()]);
+            throw new Exception("Unable to get cart.");
         }
-
-        // Each session has one cart
-        return Cart::firstOrCreate(['session_id' => $sessionId]);
     }
 
     /**
@@ -30,26 +37,34 @@ class CartService
      */
     public function addItem(array $data): CartItem
     {
-        $cart = $this->getCart();
+        try {
+            $cart = $this->getCart();
 
-        // Check if the item already exists
-        $existing = $cart->items()
-            ->where('product_id', $data['product_id'])
-            ->first();
+            // Check if the item already exists
+            $existing = $cart->items()
+                ->where('product_id', $data['product_id'])
+                ->first();
 
-        if ($existing) {
-            $existing->increment('qty');
-            return $existing;
+            if ($existing) {
+                $existing->increment('qty');
+                return $existing;
+            }
+
+            // Create new item
+            return $cart->items()->create([
+                'product_id' => $data['product_id'],
+                'name'       => $data['name'],
+                'price'      => $data['price'],
+                'image_url'  => $data['image_url'] ?? null,
+                'qty'        => 1,
+            ]);
+        } catch (Exception $e) {
+            Log::error('CartService@addItem', [
+                'data' => $data,
+                'error' => $e->getMessage()
+            ]);
+            throw new Exception("Unable to add item.");
         }
-
-        // Create new item
-        return $cart->items()->create([
-            'product_id' => $data['product_id'],
-            'name'       => $data['name'],
-            'price'      => $data['price'],
-            'image_url'  => $data['image_url'] ?? null,
-            'qty'        => 1,
-        ]);
     }
 
     /**
@@ -57,11 +72,19 @@ class CartService
      */
     protected function getItemInCart(int $itemId): CartItem
     {
-        $cart = $this->getCart();
+        try {
+            $cart = $this->getCart();
 
-        return $cart->items()
-            ->where('id', $itemId)
-            ->firstOrFail();
+            return $cart->items()
+                ->where('id', $itemId)
+                ->firstOrFail();
+        } catch (Exception $e) {
+            Log::error('CartService@getItemInCart', [
+                'item_id' => $itemId,
+                'error' => $e->getMessage()
+            ]);
+            throw new Exception("Cart item not found.");
+        }
     }
 
     /**
@@ -69,8 +92,16 @@ class CartService
      */
     public function incrementItem($itemId): void
     {
-        $item = $this->getItemInCart($itemId);
-        $item->increment('qty');
+        try {
+            $item = $this->getItemInCart($itemId);
+            $item->increment('qty');
+        } catch (Exception $e) {
+            Log::error('CartService@incrementItem', [
+                'item_id' => $itemId,
+                'error' => $e->getMessage()
+            ]);
+            throw new Exception("Unable to increment quantity.");
+        }
     }
 
     /**
@@ -78,14 +109,22 @@ class CartService
      */
     public function decrementItem($itemId): void
     {
-        $item = $this->getItemInCart($itemId);
+        try {
+            $item = $this->getItemInCart($itemId);
 
-        if ($item->qty <= 1) {
-            $item->delete();
-            return;
+            if ($item->qty <= 1) {
+                $item->delete();
+                return;
+            }
+
+            $item->decrement('qty');
+        } catch (Exception $e) {
+            Log::error('CartService@decrementItem', [
+                'item_id' => $itemId,
+                'error' => $e->getMessage()
+            ]);
+            throw new Exception("Unable to decrement quantity.");
         }
-
-        $item->decrement('qty');
     }
 
     /**
@@ -93,8 +132,16 @@ class CartService
      */
     public function removeItem($itemId): void
     {
-        $item = $this->getItemInCart($itemId);
-        $item->delete();
+        try {
+            $item = $this->getItemInCart($itemId);
+            $item->delete();
+        } catch (Exception $e) {
+            Log::error('CartService@removeItem', [
+                'item_id' => $itemId,
+                'error' => $e->getMessage()
+            ]);
+            throw new Exception("Unable to remove item.");
+        }
     }
 
     /**
@@ -102,8 +149,15 @@ class CartService
      */
     public function clear(): void
     {
-        $cart = $this->getCart();
-        $cart->items()->delete();
+        try {
+            $cart = $this->getCart();
+            $cart->items()->delete();
+        } catch (Exception $e) {
+            Log::error('CartService@clear', [
+                'error' => $e->getMessage()
+            ]);
+            throw new Exception("Unable to clear cart.");
+        }
     }
 
     /**
@@ -111,7 +165,14 @@ class CartService
      */
     public function items()
     {
-        return $this->getCart()->items()->get();
+        try {
+            return $this->getCart()->items()->get();
+        } catch (Exception $e) {
+            Log::error('CartService@items', [
+                'error' => $e->getMessage()
+            ]);
+            throw new Exception("Unable to get cart items.");
+        }
     }
 
     /**
@@ -119,9 +180,16 @@ class CartService
      */
     public function total(): float
     {
-        return $this->getCart()
-            ->items
-            ->sum(fn($i) => $i->qty * $i->price);
+        try {
+            return $this->getCart()
+                ->items
+                ->sum(fn($i) => $i->qty * $i->price);
+        } catch (Exception $e) {
+            Log::error('CartService@total', [
+                'error' => $e->getMessage()
+            ]);
+            throw new Exception("Unable to calculate total.");
+        }
     }
 
     /**
@@ -129,8 +197,15 @@ class CartService
      */
     public function quantity(): int
     {
-        return $this->getCart()
-            ->items()
-            ->sum('qty');
+        try {
+            return $this->getCart()
+                ->items()
+                ->sum('qty');
+        } catch (Exception $e) {
+            Log::error('CartService@quantity', [
+                'error' => $e->getMessage()
+            ]);
+            throw new Exception("Unable to calculate quantity.");
+        }
     }
 }

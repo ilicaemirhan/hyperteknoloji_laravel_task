@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Exception;
 
 class HyperApiClient
 {
@@ -59,7 +60,7 @@ class HyperApiClient
 
             return $response->json();
 
-        } catch (\Throwable $e) {
+        } catch (Exception $e) {
 
             // Error details logged for debugging
             Log::error("HyperApiClient error", [
@@ -91,7 +92,7 @@ class HyperApiClient
 
             return $response->json('data') ?? [];
 
-        } catch (\Throwable $e) {
+        } catch (Exception $e) {
             Log::error("HyperApiClient categories error", [
                 'url'   => $url,
                 'error' => $e->getMessage()

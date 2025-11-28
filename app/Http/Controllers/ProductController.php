@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\ProductService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Exception;
 
 class ProductController extends Controller
 {
@@ -22,32 +23,52 @@ class ProductController extends Controller
         ]);
 
 
-        // Build filter set from request query params
-        $filters = [
-            'page'              => $request->get('page', 0),
-            'pageSize'          => $request->get('pageSize', 20),
-            'productCategoryID' => $request->get('categoryID'),
-            'detailed'          => true,
-        ];
+        try {
+            // Build filter set from request query params
+            $filters = [
+                'page'              => $request->get('page', 0),
+                'pageSize'          => $request->get('pageSize', 20),
+                'productCategoryID' => $request->get('categoryID'),
+                'detailed'          => true,
+            ];
 
-        Log::info("ProductController: listing products", [
-            'filters' => $filters
-        ]);
+            Log::info("ProductController: listing products", [
+                'filters' => $filters
+            ]);
 
-        // Fetch list from service (with cache)
-        $result = $products->list($filters);
+            // Fetch list from service (with cache)
+            $result = $products->list($filters);
 
-        // Ensure minimal safe defaults
-        $productData = $result['data'] ?? [];
-        $hasMore     = $result['hasMore'] ?? false;
+            // Ensure minimal safe defaults
+            $productData = $result['data'] ?? [];
+            $hasMore     = $result['hasMore'] ?? false;
 
-        return view('products.index', [
-            'products'         => $productData,
-            'hasMore'          => $hasMore,
-            'currentPage'      => $filters['page'],
-            'pageSize'         => $filters['pageSize'],
-            'categories'       => $products->categories(),
-            'selectedCategory' => $filters['productCategoryID'],
-        ]);
+            return view('products.index', [
+                'products'         => $productData,
+                'hasMore'          => $hasMore,
+                'currentPage'      => $filters['page'],
+                'pageSize'         => $filters['pageSize'],
+                'categories'       => $products->categories(),
+                'selectedCategory' => $filters['productCategoryID'],
+            ]);
+
+        } catch (Exception $e) {
+
+            Log::error("ProductController@index failed", [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            // Fail-safe fallback → kullanıcıya boş ama çalışan bir sayfa
+            return view('products.index', [
+                'products'         => [],
+                'hasMore'          => false,
+                'currentPage'      => 0,
+                'pageSize'         => 20,
+                'categories'       => [],
+                'selectedCategory' => null,
+                'errorMessage'     => 'Ürünler yüklenirken bir sorun oluştu.',
+            ]);
+        }
     }
 }

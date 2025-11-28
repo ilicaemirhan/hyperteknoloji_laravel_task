@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Exception;
 
 class ProductService
 {
@@ -20,48 +21,62 @@ class ProductService
      */
     public function list(array $filters = []): array
     {
-        $filters = $this->normalizeFilters($filters);
+        try {
+            $filters = $this->normalizeFilters($filters);
 
-        // Build a stable cache key
-        $cacheKey = $this->makeCacheKey($filters);
+            // Build a stable cache key
+            $cacheKey = $this->makeCacheKey($filters);
 
-        Log::info("ProductService: Using cache key {$cacheKey}");
+            Log::info("ProductService: Using cache key {$cacheKey}");
 
-        return Cache::remember($cacheKey, $this->ttl, function () use ($filters) {
+            return Cache::remember($cacheKey, $this->ttl, function () use ($filters) {
 
-            $start = microtime(true);
+                $start = microtime(true);
 
-            // External API call
-            $response = $this->client->getProducts($filters);
+                // External API call
+                $response = $this->client->getProducts($filters);
 
-            $duration = round((microtime(true) - $start) * 1000, 2);
+                $duration = round((microtime(true) - $start) * 1000, 2);
 
-            Log::info("ProductService: API time {$duration}ms", [
-                'filters' => $filters
-            ]);
-
-            // Validate response shape
-            if (!is_array($response) || !isset($response['data'])) {
-                Log::warning("ProductService: Unexpected API response", [
-                    'response' => $response,
+                Log::info("ProductService: API time {$duration}ms", [
+                    'filters' => $filters
                 ]);
 
+                // Validate response shape
+                if (!is_array($response) || !isset($response['data'])) {
+                    Log::warning("ProductService: Unexpected API response", [
+                        'response' => $response,
+                    ]);
+
+                    return [
+                        'data'    => [],
+                        'hasMore' => false,
+                    ];
+                }
+
+                $data = $response['data'];
+
+                // If items count equals pageSize → likely has more pages
+                $hasMore = count($data) === $filters['pageSize'];
+
                 return [
-                    'data'    => [],
-                    'hasMore' => false,
+                    'data'    => $data,
+                    'hasMore' => $hasMore,
                 ];
-            }
+            });
 
-            $data = $response['data'];
+        } catch (Exception $e) {
+            Log::error("ProductService list() failed", [
+                'filters' => $filters ?? null,
+                'error'   => $e->getMessage(),
+            ]);
 
-            // If items count equals pageSize → likely has more pages
-            $hasMore = count($data) === $filters['pageSize'];
-
+            // In case of total failure, return safe empty structure
             return [
-                'data'    => $data,
-                'hasMore' => $hasMore,
+                'data'    => [],
+                'hasMore' => false,
             ];
-        });
+        }
     }
 
     /**
@@ -69,21 +84,30 @@ class ProductService
      */
     public function categories(): array
     {
-        $ttl = config('services.category_cache_ttl', 3600);
+        try {
+            $ttl = config('services.category_cache_ttl', 3600);
 
-        return Cache::remember("categories:list", $ttl, function () {
-            $raw = $this->client->getCategories();
+            return Cache::remember("categories:list", $ttl, function () {
+                $raw = $this->client->getCategories();
 
-            return collect($raw)
-                ->map(fn($c) => [
-                    'id'        => $c['ProductCategoryID'],
-                    'name'      => $c['CategoryName'],
-                    'parent_id' => $c['ParentID'],
-                ])
-                ->sortBy('name')
-                ->values()
-                ->all();
-        });
+                return collect($raw)
+                    ->map(fn($c) => [
+                        'id'        => $c['ProductCategoryID'],
+                        'name'      => $c['CategoryName'],
+                        'parent_id' => $c['ParentID'],
+                    ])
+                    ->sortBy('name')
+                    ->values()
+                    ->all();
+            });
+
+        } catch (Exception $e) {
+            Log::error("ProductService categories() failed", [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
     }
 
     /**
