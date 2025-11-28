@@ -1,6 +1,6 @@
 # HyperTeknoloji Laravel Task — Kurulum
 Gereksinimler
-- PHP 8.1+ (veya proje tarafından gerektirileni)
+- PHP 8.0+ 
 - Composer
 - Node.js + npm (frontend asset'ler için opsiyonel)
 
@@ -19,7 +19,7 @@ cd hyperteknoloji_laravel_task
 composer install
 ```
 
-3. Node bağımlılıkları (varsa)
+3. Node bağımlılıklarını kurun
 
 ```bash
 npm install
@@ -36,7 +36,7 @@ cp .env.example .env
 php artisan key:generate
 ```
 
-5. Önemli environment değişkenleri (örnek)
+5. Önemli environment değişkenleri
 
 ```
 HYPER_API_BASE_URL=https://api.hyperteknoloji.com.tr
@@ -53,7 +53,7 @@ SESSION_DRIVER=redis
 
 Not: `config/services.php` içinde `hypertech` anahtarıyla bu değişkenlerin okutulduğundan emin olun.
 
-6. Veritabanı migrasyonları (gerekliyse)
+6. Veritabanı migrasyonlarını yapın
 
 ```bash
 php artisan migrate

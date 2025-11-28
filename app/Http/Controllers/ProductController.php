@@ -10,6 +10,18 @@ class ProductController extends Controller
 {
     public function index(Request $request, ProductService $products)
     {
+
+        Log::info('REQUEST DEBUG', [
+            'full_url' => request()->fullUrl(),
+            'scheme' => request()->getScheme(),
+            'is_secure' => request()->isSecure(),
+            'server_port' => request()->server('SERVER_PORT'),
+            'x_forwarded_proto' => request()->header('X-Forwarded-Proto'),
+            'x_forwarded_ssl' => request()->header('X-Forwarded-Ssl'),
+            'headers' => request()->headers->all(),
+        ]);
+
+
         // Build filter set from request query params
         $filters = [
             'page'              => $request->get('page', 0),
