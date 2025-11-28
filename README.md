@@ -1,11 +1,13 @@
-# HyperTeknoloji Laravel Task — Kurulum
-Gereksinimler
+# HyperTeknoloji Laravel Task
+
+## Kurulum
+
+**Gereksinimler**
 - PHP 8.0+ 
 - Composer
 - Node.js + npm (frontend asset'ler için opsiyonel)
 
-Hızlı kurulum
-
+**Hızlı kurulum**
 1. Depoyu klonlayın ve dizine girin
 
 ```bash
